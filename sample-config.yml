@@ -2,6 +2,9 @@
 exporter:
   listenAddress: 0.0.0.0:9103
 nodes:
+  - url: http://localhost:8080
+    labels:
+      env: testing
   - url: http://test-nifi.example.com:8080
     username: nifitest
     password: abc123

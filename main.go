@@ -28,8 +28,8 @@ type Configuration struct {
 	Nodes []struct {
 		URL            string            `yaml:"url" validate:"required,url"`
 		CACertificates string            `yaml:"caCertificates"`
-		Username       string            `yaml:"username" validate:"required"`
-		Password       string            `yaml:"password" validate:"required"`
+		Username       string            `yaml:"username"`
+		Password       string            `yaml:"password"`
 		Labels         map[string]string `yaml:"labels"`
 	} `yaml:"nodes" validate:"required,dive"`
 }

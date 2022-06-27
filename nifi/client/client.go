@@ -31,7 +31,7 @@ type Credentials struct {
 type Client struct {
 	baseURL     string
 	client      http.Client
-	credentials url.Values
+	credentials *url.Values
 
 	token                    string
 	tokenMx                  sync.Mutex
@@ -51,10 +51,12 @@ type jwtPayload struct {
 func NewClient(baseURL, username, password, caCertificates string) (*Client, error) {
 	c := Client{
 		baseURL: strings.TrimRight(baseURL, "/") + "/nifi-api",
-		credentials: url.Values{
+	}
+	if username != "" && password != "" {
+		c.credentials = &url.Values{
 			"username": []string{username},
 			"password": []string{password},
-		},
+		}
 	}
 	if caCertificates != "" {
 		certPool := x509.NewCertPool()
@@ -196,11 +198,6 @@ func (c *Client) GetSystemDiagnostics(nodewise bool, clusterNodeId string) (*Sys
 }
 
 func (c *Client) request(path string, query url.Values, responseEntity interface{}) error {
-	token, err := c.getToken()
-	if err != nil {
-		return errors.Trace(err)
-	}
-
 	reqURL := c.baseURL + path
 	log.WithField("url", reqURL).Info("Requesting api resource......")
 	if query != nil && len(query) > 0 {
@@ -211,7 +208,14 @@ func (c *Client) request(path string, query url.Values, responseEntity interface
 	if err != nil {
 		return errors.Annotate(err, "Error while preparing API request")
 	}
-	req.Header.Add("Authorization", token)
+	// Inject authentication if available
+	if c.credentials != nil {
+		token, err := c.getToken()
+		if err != nil {
+			return errors.Trace(err)
+		}
+		req.Header.Add("Authorization", token)
+	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -262,7 +266,7 @@ func (c *Client) authenticate() error {
 		"username": c.credentials.Get("username"),
 	}).Info("Authentication token has expired, reauthenticating...")
 
-	resp, err := c.client.PostForm(c.baseURL+"/access/token", c.credentials)
+	resp, err := c.client.PostForm(c.baseURL+"/access/token", *c.credentials)
 	if err != nil {
 		return errors.Annotate(err, "Couldn't request access token from NiFi")
 	}
