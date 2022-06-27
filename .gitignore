@@ -1,3 +1,4 @@
+.vscode
 .DS_Store
 /config.yml
 /nifi_exporter
