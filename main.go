@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-playground/locales/en"
-	"github.com/go-playground/universal-translator"
+	ut "github.com/go-playground/universal-translator"
 	"github.com/juju/errors"
 	"github.com/msiedlarek/nifi_exporter/nifi/client"
 	"github.com/msiedlarek/nifi_exporter/nifi/collectors"
