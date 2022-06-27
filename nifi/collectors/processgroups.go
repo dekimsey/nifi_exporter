@@ -1,15 +1,17 @@
 package collectors
 
 import (
+	"time"
+
 	"github.com/msiedlarek/nifi_exporter/nifi/client"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 type ProcessGroupsCollector struct {
-	api *client.Client
-
-	bulletin5mCount *prometheus.Desc
-	componentCount  *prometheus.Desc
+	api               *client.Client
+	scrapeDurationSec *prometheus.Desc
+	bulletin5mCount   *prometheus.Desc
+	componentCount    *prometheus.Desc
 
 	inFlowFiles5mCount          *prometheus.Desc
 	inBytes5mCount              *prometheus.Desc
@@ -33,7 +35,12 @@ func NewProcessGroupsCollector(api *client.Client, labels map[string]string) *Pr
 	statLabels := []string{"node_id", "group", "entity_id"}
 	return &ProcessGroupsCollector{
 		api: api,
-
+		scrapeDurationSec: prometheus.NewDesc(
+			prefix+"scrape_collector_duration_seconds",
+			"Duration of connections collector scrape.",
+			nil,
+			labels,
+		),
 		bulletin5mCount: prometheus.NewDesc(
 			prefix+"bulletin_5m_count",
 			"Number of bulletins posted during last 5 minutes.",
@@ -141,6 +148,7 @@ func NewProcessGroupsCollector(api *client.Client, labels map[string]string) *Pr
 }
 
 func (c *ProcessGroupsCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- c.scrapeDurationSec
 	ch <- c.bulletin5mCount
 	ch <- c.componentCount
 
@@ -162,6 +170,7 @@ func (c *ProcessGroupsCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (c *ProcessGroupsCollector) Collect(ch chan<- prometheus.Metric) {
+	begin := time.Now()
 	entities, err := c.api.GetDeepProcessGroups(rootProcessGroupID)
 	if err != nil {
 		ch <- prometheus.NewInvalidMetric(c.componentCount, err)
@@ -171,6 +180,9 @@ func (c *ProcessGroupsCollector) Collect(ch chan<- prometheus.Metric) {
 	for i := range entities {
 		c.collect(ch, &entities[i])
 	}
+
+	duration := time.Since(begin)
+	ch <- prometheus.MustNewConstMetric(c.scrapeDurationSec, prometheus.GaugeValue, duration.Seconds())
 }
 
 func (c *ProcessGroupsCollector) collect(ch chan<- prometheus.Metric, entity *client.ProcessGroupEntity) {

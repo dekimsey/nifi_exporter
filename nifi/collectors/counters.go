@@ -1,6 +1,8 @@
 package collectors
 
 import (
+	"time"
+
 	"github.com/juju/errors"
 	"github.com/msiedlarek/nifi_exporter/nifi/client"
 	"github.com/prometheus/client_golang/prometheus"
@@ -10,6 +12,7 @@ type CountersCollector struct {
 	alias              string
 	api                *client.Client
 	counterTotalMetric *prometheus.Desc
+	scrapeDurationSec  *prometheus.Desc
 }
 
 func NewCountersCollector(api *client.Client, labels map[string]string) *CountersCollector {
@@ -21,14 +24,22 @@ func NewCountersCollector(api *client.Client, labels map[string]string) *Counter
 			[]string{"node_id", "id", "context", "name"},
 			labels,
 		),
+		scrapeDurationSec: prometheus.NewDesc(
+			MetricNamePrefix+"counter_scrape_collector_duration_seconds",
+			"Duration of counter collector scrape.",
+			nil,
+			labels,
+		),
 	}
 }
 
 func (c *CountersCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.counterTotalMetric
+	ch <- c.scrapeDurationSec
 }
 
 func (c *CountersCollector) Collect(ch chan<- prometheus.Metric) {
+	begin := time.Now()
 	counterStats, err := c.api.GetCounters(true, "")
 	if err != nil {
 		ch <- prometheus.NewInvalidMetric(
@@ -62,4 +73,7 @@ func (c *CountersCollector) Collect(ch chan<- prometheus.Metric) {
 			)
 		}
 	}
+
+	duration := time.Since(begin)
+	ch <- prometheus.MustNewConstMetric(c.scrapeDurationSec, prometheus.GaugeValue, duration.Seconds())
 }

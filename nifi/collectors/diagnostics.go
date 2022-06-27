@@ -1,6 +1,8 @@
 package collectors
 
 import (
+	"time"
+
 	"github.com/msiedlarek/nifi_exporter/nifi/client"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -35,8 +37,8 @@ type storageMetrics struct {
 }
 
 type DiagnosticsCollector struct {
-	api *client.Client
-
+	api               *client.Client
+	scrapeDurationSec *prometheus.Desc
 	generalMetrics
 	jvmMetrics
 	storageMetrics
@@ -48,7 +50,12 @@ func NewDiagnosticsCollector(api *client.Client, labels map[string]string) *Diag
 	storageMetricsPrefix := MetricNamePrefix + "stor_"
 	return &DiagnosticsCollector{
 		api: api,
-
+		scrapeDurationSec: prometheus.NewDesc(
+			MetricNamePrefix+"diag_collector_duration_seconds",
+			"Duration of diagnostics collector scrape.",
+			nil,
+			labels,
+		),
 		generalMetrics: generalMetrics{
 			info: prometheus.NewDesc(
 				MetricNamePrefix+"info",
@@ -179,6 +186,7 @@ func NewDiagnosticsCollector(api *client.Client, labels map[string]string) *Diag
 }
 
 func (c *DiagnosticsCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- c.scrapeDurationSec
 	ch <- c.generalMetrics.info
 	ch <- c.generalMetrics.osInfo
 
@@ -202,6 +210,7 @@ func (c *DiagnosticsCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 func (c *DiagnosticsCollector) Collect(ch chan<- prometheus.Metric) {
+	begin := time.Now()
 	diagnostics, err := c.api.GetSystemDiagnostics(true, "")
 	if err != nil {
 		ch <- prometheus.NewInvalidMetric(c.generalMetrics.info, err)
@@ -362,6 +371,9 @@ func (c *DiagnosticsCollector) Collect(ch chan<- prometheus.Metric) {
 			)
 		}
 	}
+
+	duration := time.Since(begin)
+	ch <- prometheus.MustNewConstMetric(c.scrapeDurationSec, prometheus.GaugeValue, duration.Seconds())
 }
 
 func (c *DiagnosticsCollector) collectStorageUsage(ch chan<- prometheus.Metric, nodeID, storageType, location string, usage *client.StorageUsageDTO) {

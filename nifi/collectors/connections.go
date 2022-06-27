@@ -1,6 +1,8 @@
 package collectors
 
 import (
+	"time"
+
 	"github.com/msiedlarek/nifi_exporter/nifi/client"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -9,7 +11,8 @@ import (
 type ConnectionsCollector struct {
 	api *client.Client
 
-	flowFilesQueued *prometheus.Desc
+	scrapeDurationSec *prometheus.Desc
+	flowFilesQueued   *prometheus.Desc
 }
 
 // NewConnectionsCollector initialises a collector
@@ -24,6 +27,12 @@ func NewConnectionsCollector(api *client.Client, labels map[string]string) *Conn
 			statLabels,
 			labels,
 		),
+		scrapeDurationSec: prometheus.NewDesc(
+			prefix+"scrape_collector_duration_seconds",
+			"Duration of connections collector scrape.",
+			nil,
+			labels,
+		),
 	}
 }
 
@@ -34,11 +43,14 @@ func (c *ConnectionsCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect retrieves the data that for the metrics
 func (c *ConnectionsCollector) Collect(ch chan<- prometheus.Metric) {
+	begin := time.Now()
 	entities, err := c.api.GetConnections(rootProcessGroupID)
 	if err != nil {
 		ch <- prometheus.NewInvalidMetric(c.flowFilesQueued, err)
 		return
 	}
+	duration := time.Since(begin)
+	ch <- prometheus.MustNewConstMetric(c.scrapeDurationSec, prometheus.GaugeValue, duration.Seconds())
 
 	for i := range entities {
 		c.collect(ch, &entities[i])
