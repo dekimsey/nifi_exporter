@@ -1,0 +1,27 @@
+before:
+  hooks:
+    - go mod download
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    flags:
+      - -trimpath
+    goarch:
+      - amd64
+    mod_timestamp: '{{ .CommitTimestamp }}'
+archives:
+- id: default
+checksum:
+  name_template: '{{ .ProjectName }}_{{ .Version }}_SHA256SUMS'
+  algorithm: sha256
+snapshot:
+  name_template: "{{ incpatch .Version }}-rc"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'
